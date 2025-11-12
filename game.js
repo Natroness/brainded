@@ -75,6 +75,40 @@ jumpSound.addEventListener('ended', () => {
 
 const endSound = new Audio('src/audio/endsound.mp3');
 endSound.volume = 0.4; // 40% volume
+endSound.preload = 'auto'; // Preload the audio for instant playback
+
+// Function to play only the last 1 second of end sound
+function playEndSound() {
+    // Stop any currently playing sound
+    endSound.pause();
+    
+    // Set to last 1 second and play immediately
+    if (endSound.duration && endSound.duration > 0) {
+        endSound.currentTime = Math.max(0, endSound.duration - 1);
+    } else {
+        // If duration not available yet, try to get it
+        const tryPlay = () => {
+            if (endSound.duration && endSound.duration > 0) {
+                endSound.currentTime = Math.max(0, endSound.duration - 1);
+            }
+            endSound.play().catch(e => {
+                console.log('End sound will play after user interaction');
+            });
+        };
+        
+        // Try immediately
+        tryPlay();
+        
+        // Also listen for metadata if needed
+        endSound.addEventListener('loadedmetadata', tryPlay, { once: true });
+        return;
+    }
+    
+    // Play immediately
+    endSound.play().catch(e => {
+        console.log('End sound will play after user interaction');
+    });
+}
 
 // ============================================
 // SETUP FUNCTION
@@ -240,8 +274,19 @@ function draw() {
     ctx.fillStyle = '#FFFFFF'; // White color
     ctx.fillRect(0, 0, CANVAS_WIDTH, 120);
     
-    // Only draw game elements if game is not over
+    // Draw bird (always visible, even on start screen)
     if (!gameState.gameOver) {
+        ctx.drawImage(
+            bird.image,
+            bird.x,
+            bird.y,
+            bird.width,
+            bird.height
+        );
+    }
+    
+    // Only draw game elements if game is running and not over
+    if (gameState.running && !gameState.gameOver) {
         // Draw thrones as rectangles with l1.png image on top
         for (const throne of thrones) {
             // Draw rectangle throne with opacity 0 (transparent)
@@ -282,15 +327,6 @@ function draw() {
                 );
             }
         }
-        
-        // Draw bird
-        ctx.drawImage(
-            bird.image,
-            bird.x,
-            bird.y,
-            bird.width,
-            bird.height
-        );
     
         // Draw score
         ctx.fillStyle = '#FFFFFF';
@@ -299,6 +335,50 @@ function draw() {
         ctx.lineWidth = 12;
         ctx.strokeText(`Score: ${gameState.score}`, 40, 160);
         ctx.fillText(`Score: ${gameState.score}`, 40, 160);
+    }
+    
+    // Draw start screen
+    if (!gameState.running && !gameState.gameOver) {
+        // Draw semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        // Draw game title
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 144px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 10;
+        const titleText = 'KAIDO BIRD';
+        const titleTextX = (CANVAS_WIDTH - ctx.measureText(titleText).width) / 2;
+        const titleTextY = CANVAS_HEIGHT / 2 - 150;
+        ctx.strokeText(titleText, titleTextX, titleTextY);
+        ctx.fillText(titleText, titleTextX, titleTextY);
+        
+        // Draw instructions
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 72px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        const instructionText = 'Press SPACE to Start';
+        const instructionTextX = (CANVAS_WIDTH - ctx.measureText(instructionText).width) / 2;
+        const instructionTextY = CANVAS_HEIGHT / 2 + 50;
+        ctx.strokeText(instructionText, instructionTextX, instructionTextY);
+        ctx.fillText(instructionText, instructionTextX, instructionTextY);
+        
+        // Draw game instructions
+        ctx.fillStyle = '#CCCCCC';
+        ctx.font = 'bold 48px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 6;
+        const gameInstruction1 = 'Press SPACE to make Kaido jump';
+        const gameInstruction2 = 'Avoid the obstacles!';
+        const gameInstruction1X = (CANVAS_WIDTH - ctx.measureText(gameInstruction1).width) / 2;
+        const gameInstruction2X = (CANVAS_WIDTH - ctx.measureText(gameInstruction2).width) / 2;
+        const gameInstructionY = CANVAS_HEIGHT / 2 + 200;
+        ctx.strokeText(gameInstruction1, gameInstruction1X, gameInstructionY);
+        ctx.fillText(gameInstruction1, gameInstruction1X, gameInstructionY);
+        ctx.strokeText(gameInstruction2, gameInstruction2X, gameInstructionY + 70);
+        ctx.fillText(gameInstruction2, gameInstruction2X, gameInstructionY + 70);
     }
     
     // Draw game over screen
@@ -386,6 +466,9 @@ function jump() {
 function endGame() {
     if (gameState.gameOver) return;
     
+    // Play end screen sound instantly (only last 1 second)
+    playEndSound();
+    
     gameState.gameOver = true;
     gameState.running = false;
     // Keep HTML game over screen hidden, we'll draw on canvas instead
@@ -398,13 +481,6 @@ function endGame() {
     jumpSound.pause();
     jumpSound.currentTime = 0;
     isJumpSoundPlaying = false;
-    
-    // Play end screen sound starting from 2 seconds
-    endSound.currentTime = 2; // Start from 2 seconds
-    endSound.play().catch(e => {
-        // Handle autoplay restrictions
-        console.log('End sound will play after user interaction');
-    });
 }
 
 // ============================================
