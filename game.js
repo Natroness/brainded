@@ -46,14 +46,35 @@ const throneImage = new Image();
 throneImage.src = 'src/image/l1.png';
 const backgroundImage = new Image();
 backgroundImage.src = 'src/image/wano.jpg';
+const lostImage = new Image();
+lostImage.src = 'src/image/lost.jpg';
 
 // Audio
 const backgroundMusic = new Audio('src/audio/luffy.mp3');
-backgroundMusic.loop = true;
+backgroundMusic.loop = false; // We'll handle looping manually to skip last 5 seconds
 backgroundMusic.volume = 0.2; // 20% volume
+
+// End background music before last 5 seconds
+backgroundMusic.addEventListener('timeupdate', () => {
+    if (backgroundMusic.duration && backgroundMusic.currentTime > backgroundMusic.duration - 5) {
+        backgroundMusic.currentTime = 0;
+        backgroundMusic.play().catch(e => {
+            console.log('Background music will play after user interaction');
+        });
+    }
+});
 
 const jumpSound = new Audio('src/audio/Kaido.mp3');
 jumpSound.volume = 0.5; // 50% volume
+let isJumpSoundPlaying = false; // Track if jump sound is currently playing
+
+// Reset flag when jump sound finishes playing
+jumpSound.addEventListener('ended', () => {
+    isJumpSoundPlaying = false;
+});
+
+const endSound = new Audio('src/audio/endsound.mp3');
+endSound.volume = 0.4; // 40% volume
 
 // ============================================
 // SETUP FUNCTION
@@ -81,6 +102,10 @@ function setup() {
             console.log('Background music will play after user interaction');
         });
     }
+    
+    // Stop end sound if it's playing
+    endSound.pause();
+    endSound.currentTime = 0;
     
     // Start spawning thrones after a delay
     setTimeout(spawnThrone, 2000);
@@ -215,63 +240,108 @@ function draw() {
     ctx.fillStyle = '#FFFFFF'; // White color
     ctx.fillRect(0, 0, CANVAS_WIDTH, 120);
     
-    // Draw thrones as rectangles with l1.png image on top
-    for (const throne of thrones) {
-        // Draw rectangle throne with opacity 0 (transparent)
-        ctx.globalAlpha = 0;
-        ctx.fillStyle = '#8B4513'; // Brown color
-        ctx.fillRect(throne.x, throne.y, throne.width, throne.height);
-        
-        // Add border (also transparent)
-        ctx.strokeStyle = '#654321'; // Darker brown border
-        ctx.lineWidth = 5;
-        ctx.strokeRect(throne.x, throne.y, throne.width, throne.height);
-        
-        // Draw l1.png image with full opacity (visible)
-        ctx.globalAlpha = 1.0;
-        if (throne.y === 0) {
-            // Top throne - draw image upside down at the bottom of the rectangle
-            ctx.save();
-            // Flip the image vertically only
-            const imageY = throne.y + throne.height - THRONE_IMAGE_HEIGHT;
-            ctx.translate(throne.x + throne.width / 2, imageY + THRONE_IMAGE_HEIGHT / 2);
-            ctx.scale(1, -1); // Flip vertically only
-            ctx.drawImage(
-                throneImage,
-                -throne.width / 2,
-                -THRONE_IMAGE_HEIGHT / 2,
-                throne.width,
-                THRONE_IMAGE_HEIGHT
-            );
-            ctx.restore();
-        } else {
-            // Bottom throne - draw image at the top of the rectangle (normal orientation)
-            ctx.drawImage(
-                throneImage,
-                throne.x,
-                throne.y,
-                throne.width,
-                THRONE_IMAGE_HEIGHT
-            );
+    // Only draw game elements if game is not over
+    if (!gameState.gameOver) {
+        // Draw thrones as rectangles with l1.png image on top
+        for (const throne of thrones) {
+            // Draw rectangle throne with opacity 0 (transparent)
+            ctx.globalAlpha = 0;
+            ctx.fillStyle = '#8B4513'; // Brown color
+            ctx.fillRect(throne.x, throne.y, throne.width, throne.height);
+            
+            // Add border (also transparent)
+            ctx.strokeStyle = '#654321'; // Darker brown border
+            ctx.lineWidth = 5;
+            ctx.strokeRect(throne.x, throne.y, throne.width, throne.height);
+            
+            // Draw l1.png image with full opacity (visible)
+            ctx.globalAlpha = 1.0;
+            if (throne.y === 0) {
+                // Top throne - draw image upside down at the bottom of the rectangle
+                ctx.save();
+                // Flip the image vertically only
+                const imageY = throne.y + throne.height - THRONE_IMAGE_HEIGHT;
+                ctx.translate(throne.x + throne.width / 2, imageY + THRONE_IMAGE_HEIGHT / 2);
+                ctx.scale(1, -1); // Flip vertically only
+                ctx.drawImage(
+                    throneImage,
+                    -throne.width / 2,
+                    -THRONE_IMAGE_HEIGHT / 2,
+                    throne.width,
+                    THRONE_IMAGE_HEIGHT
+                );
+                ctx.restore();
+            } else {
+                // Bottom throne - draw image at the top of the rectangle (normal orientation)
+                ctx.drawImage(
+                    throneImage,
+                    throne.x,
+                    throne.y,
+                    throne.width,
+                    THRONE_IMAGE_HEIGHT
+                );
+            }
         }
+        
+        // Draw bird
+        ctx.drawImage(
+            bird.image,
+            bird.x,
+            bird.y,
+            bird.width,
+            bird.height
+        );
+    
+        // Draw score
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 128px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 12;
+        ctx.strokeText(`Score: ${gameState.score}`, 40, 160);
+        ctx.fillText(`Score: ${gameState.score}`, 40, 160);
     }
     
-    // Draw bird
-    ctx.drawImage(
-        bird.image,
-        bird.x,
-        bird.y,
-        bird.width,
-        bird.height
-    );
-    
-    // Draw score
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 128px Arial';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 12;
-    ctx.strokeText(`Score: ${gameState.score}`, 40, 160);
-    ctx.fillText(`Score: ${gameState.score}`, 40, 160);
+    // Draw game over screen
+    if (gameState.gameOver) {
+        // Draw semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        
+        // Draw lost image (centered)
+        const lostImageWidth = 800;
+        const lostImageHeight = 600;
+        const lostImageX = (CANVAS_WIDTH - lostImageWidth) / 2;
+        const lostImageY = (CANVAS_HEIGHT - lostImageHeight) / 2 - 100;
+        ctx.drawImage(
+            lostImage,
+            lostImageX,
+            lostImageY,
+            lostImageWidth,
+            lostImageHeight
+        );
+        
+        // Draw total score
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 96px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        const scoreText = `Total Score: ${gameState.score}`;
+        const scoreTextX = (CANVAS_WIDTH - ctx.measureText(scoreText).width) / 2;
+        const scoreTextY = lostImageY + lostImageHeight + 100;
+        ctx.strokeText(scoreText, scoreTextX, scoreTextY);
+        ctx.fillText(scoreText, scoreTextX, scoreTextY);
+        
+        // Draw restart instruction
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 64px Arial';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 6;
+        const restartText = 'Press SPACE to restart';
+        const restartTextX = (CANVAS_WIDTH - ctx.measureText(restartText).width) / 2;
+        const restartTextY = scoreTextY + 100;
+        ctx.strokeText(restartText, restartTextX, restartTextY);
+        ctx.fillText(restartText, restartTextX, restartTextY);
+    }
 }
 
 // ============================================
@@ -301,12 +371,16 @@ function jump() {
     // Make bird jump
     bird.velocity = JUMP_STRENGTH;
     
-    // Play jump sound effect
-    jumpSound.currentTime = 0; // Reset to start
-    jumpSound.play().catch(e => {
-        // Handle autoplay restrictions
-        console.log('Jump sound will play after user interaction');
-    });
+    // Play jump sound effect starting from 3 seconds (only if not already playing)
+    if (!isJumpSoundPlaying) {
+        jumpSound.currentTime = 3; // Start from 3 seconds
+        isJumpSoundPlaying = true;
+        jumpSound.play().catch(e => {
+            // Handle autoplay restrictions
+            console.log('Jump sound will play after user interaction');
+            isJumpSoundPlaying = false;
+        });
+    }
 }
 
 function endGame() {
@@ -314,10 +388,23 @@ function endGame() {
     
     gameState.gameOver = true;
     gameState.running = false;
-    gameOverScreen.classList.remove('hidden');
+    // Keep HTML game over screen hidden, we'll draw on canvas instead
+    gameOverScreen.classList.add('hidden');
     
     // Pause background music on game over
     backgroundMusic.pause();
+    
+    // Immediately pause jump sound when died
+    jumpSound.pause();
+    jumpSound.currentTime = 0;
+    isJumpSoundPlaying = false;
+    
+    // Play end screen sound starting from 2 seconds
+    endSound.currentTime = 2; // Start from 2 seconds
+    endSound.play().catch(e => {
+        // Handle autoplay restrictions
+        console.log('End sound will play after user interaction');
+    });
 }
 
 // ============================================
@@ -347,7 +434,7 @@ function gameLoop() {
 // ============================================
 // Wait for images to load before starting
 let imagesLoaded = 0;
-const totalImages = 3;
+const totalImages = 4;
 
 function imageLoaded() {
     imagesLoaded++;
@@ -362,9 +449,10 @@ function imageLoaded() {
 bird.image.onload = imageLoaded;
 throneImage.onload = imageLoaded;
 backgroundImage.onload = imageLoaded;
+lostImage.onload = imageLoaded;
 
 // Handle case where images might already be cached
-if (bird.image.complete && throneImage.complete && backgroundImage.complete) {
+if (bird.image.complete && throneImage.complete && backgroundImage.complete && lostImage.complete) {
     imagesLoaded = totalImages;
     gameLoop();
     draw();
